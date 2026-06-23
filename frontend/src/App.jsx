@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
 import FieldSelectionPage from './pages/FieldSelectionPage'
@@ -7,9 +7,26 @@ import { wellsByField } from './data/mockData'
 
 function App() {
   const [selectedField, setSelectedField] = useState(null)
+  const [backendStatus, setBackendStatus] = useState('Checking backend...')
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((response) => response.json())
+      .then((data) => {
+        setBackendStatus(data.message)
+      })
+      .catch(() => {
+        setBackendStatus('Backend not connected')
+      })
+  }, [])
 
   if (!selectedField) {
-    return <FieldSelectionPage onSelectField={setSelectedField} />
+    return (
+      <FieldSelectionPage
+        backendStatus={backendStatus}
+        onSelectField={setSelectedField}
+      />
+    )
   }
 
   return (

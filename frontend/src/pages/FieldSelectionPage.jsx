@@ -1,12 +1,13 @@
 import { fields } from '../data/mockData'
 
-function FieldSelectionPage({ onSelectField }) {
+function FieldSelectionPage({ backendStatus, onSelectField }) {
   return (
     <main className="app">
       <header className="header">
         <p className="eyebrow">Reservoir Engineering</p>
         <h1>RE Junior Assistant</h1>
         <p className="subtitle">Select a field to begin surveillance review.</p>
+        <p className="backend-status">Backend: {backendStatus}</p>
       </header>
 
       <section className="field-grid">

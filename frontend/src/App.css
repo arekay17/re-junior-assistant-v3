@@ -243,3 +243,14 @@ dd {
     grid-template-columns: 1fr;
   }
 }
+
+.backend-status {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 14px;
+}
