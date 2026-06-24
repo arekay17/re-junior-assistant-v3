@@ -3,11 +3,12 @@ import './App.css'
 
 import FieldSelectionPage from './pages/FieldSelectionPage'
 import FieldDashboard from './pages/FieldDashboard'
-import { wellsByField } from './data/mockData'
 
 function App() {
-  const [selectedField, setSelectedField] = useState(null)
   const [backendStatus, setBackendStatus] = useState('Checking backend...')
+  const [fields, setFields] = useState([])
+  const [selectedField, setSelectedField] = useState(null)
+  const [wells, setWells] = useState([])
 
   useEffect(() => {
     fetch('/api/health')
@@ -18,13 +19,36 @@ function App() {
       .catch(() => {
         setBackendStatus('Backend not connected')
       })
+
+    fetch('/api/fields')
+      .then((response) => response.json())
+      .then((data) => {
+        setFields(data)
+      })
+      .catch(() => {
+        setFields([])
+      })
   }, [])
+
+  function handleSelectField(field) {
+    setSelectedField(field)
+
+    fetch(`/api/fields/${field.id}/wells`)
+      .then((response) => response.json())
+      .then((data) => {
+        setWells(data)
+      })
+      .catch(() => {
+        setWells([])
+      })
+  }
 
   if (!selectedField) {
     return (
       <FieldSelectionPage
         backendStatus={backendStatus}
-        onSelectField={setSelectedField}
+        fields={fields}
+        onSelectField={handleSelectField}
       />
     )
   }
@@ -32,7 +56,7 @@ function App() {
   return (
     <FieldDashboard
       field={selectedField}
-      wells={wellsByField[selectedField.id]}
+      wells={wells}
       onBack={() => setSelectedField(null)}
     />
   )

@@ -1,6 +1,5 @@
-import { fields } from '../data/mockData'
 
-function FieldSelectionPage({ backendStatus, onSelectField }) {
+function FieldSelectionPage({ backendStatus, fields, onSelectField }) {
   return (
     <main className="app">
       <header className="header">
