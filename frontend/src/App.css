@@ -262,3 +262,11 @@ dd {
 .history-table h3 {
   margin-top: 0;
 }
+.chart-container {
+  margin-bottom: 20px;
+}
+
+.chart-container h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+}

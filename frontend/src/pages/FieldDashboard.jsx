@@ -4,6 +4,9 @@ import SummaryCards from '../components/SummaryCards'
 import WellTable from '../components/WellTable'
 import WellDetail from '../components/WellDetail'
 import ProductionHistoryTable from '../components/ProductionHistoryTable'
+import ProductionHistoryChart from '../components/ProductionHistoryChart'
+import WaterCutChart from '../components/WaterCutChart'
+import GorChart from '../components/GorChart'
 
 function FieldDashboard({
   field,
@@ -98,7 +101,12 @@ function FieldDashboard({
             {historyError && <p>{historyError}</p>}
 
             {!isLoadingHistory && !historyError && (
+              <>
+              <ProductionHistoryChart history={productionHistory} />
+              <WaterCutChart history={productionHistory} />
+              <GorChart history={productionHistory} />
               <ProductionHistoryTable history={productionHistory} />
+              </>
             )}
           </section>
         </>
