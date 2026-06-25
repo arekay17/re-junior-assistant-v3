@@ -1,5 +1,5 @@
 
-function FieldSelectionPage({ backendStatus, fields, onSelectField }) {
+function FieldSelectionPage({ backendStatus, fields, isLoadingFields, fieldsError, onSelectField }) {
   return (
     <main className="app">
       <header className="header">
@@ -8,21 +8,35 @@ function FieldSelectionPage({ backendStatus, fields, onSelectField }) {
         <p className="subtitle">Select a field to begin surveillance review.</p>
         <p className="backend-status">Backend: {backendStatus}</p>
       </header>
-
       <section className="field-grid">
-        {fields.map((field) => (
-          <button
-            key={field.id}
-            type="button"
-            className="field-card"
-            onClick={() => onSelectField(field)}
-          >
-            <span>Field</span>
-            <strong>{field.name}</strong>
-            <p>{field.description}</p>
-          </button>
-        ))}
+        {isLoadingFields && (
+          <div className="panel">
+            <p>Loading fields...</p>
+          </div>
+        )}
+
+        {fieldsError && (
+          <div className="panel">
+            <p>{fieldsError}</p>
+          </div>
+        )}
+
+        {!isLoadingFields &&
+          !fieldsError &&
+          fields.map((field) => (
+            <button
+              key={field.id}
+              type="button"
+              className="field-card"
+              onClick={() => onSelectField(field)}
+            >
+              <span>Field</span>
+              <strong>{field.name}</strong>
+              <p>{field.description}</p>
+            </button>
+          ))}
       </section>
+      
     </main>
   )
 }

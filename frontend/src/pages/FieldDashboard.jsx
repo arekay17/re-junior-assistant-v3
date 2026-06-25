@@ -3,9 +3,20 @@ import { useEffect, useState } from 'react'
 import SummaryCards from '../components/SummaryCards'
 import WellTable from '../components/WellTable'
 import WellDetail from '../components/WellDetail'
+import ProductionHistoryTable from '../components/ProductionHistoryTable'
 
-function FieldDashboard({ field, wells, onBack }) {
+function FieldDashboard({
+  field,
+  wells,
+  isLoadingWells,
+  wellsError,
+  onBack,
+}) {
   const [selectedWell, setSelectedWell] = useState(null)
+
+  const [productionHistory, setProductionHistory] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [historyError, setHistoryError] = useState('')
 
   useEffect(() => {
     if (wells.length > 0) {
@@ -13,21 +24,33 @@ function FieldDashboard({ field, wells, onBack }) {
     }
   }, [wells])
 
-  if (!selectedWell) {
-    return (
-      <main className="app">
-        <button type="button" className="back-button" onClick={onBack}>
-          Back to fields
-        </button>
+  useEffect(() => {
+    if (!selectedWell) {
+      return
+    }
 
-        <header className="header">
-          <p className="eyebrow">Reservoir Engineering</p>
-          <h1>{field.name} Dashboard</h1>
-          <p className="subtitle">Loading wells...</p>
-        </header>
-      </main>
-    )
-  }
+    setIsLoadingHistory(true)
+    setHistoryError('')
+
+    fetch(`/api/wells/${selectedWell.id}/history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load history')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setProductionHistory(data)
+      })
+      .catch(() => {
+        setProductionHistory([])
+        setHistoryError('Unable to load production history')
+      })
+      .finally(() => {
+        setIsLoadingHistory(false)
+      })
+  }, [selectedWell])
 
   return (
     <main className="app">
@@ -43,17 +66,43 @@ function FieldDashboard({ field, wells, onBack }) {
         </p>
       </header>
 
-      <SummaryCards wells={wells} />
+      {isLoadingWells && (
+        <div className="panel">
+          <p>Loading wells...</p>
+        </div>
+      )}
 
-      <section className="layout">
-        <WellTable
-          wells={wells}
-          selectedWell={selectedWell}
-          onSelectWell={setSelectedWell}
-        />
+      {wellsError && (
+        <div className="panel">
+          <p>{wellsError}</p>
+        </div>
+      )}
 
-        <WellDetail selectedWell={selectedWell} />
-      </section>
+      {!isLoadingWells && !wellsError && selectedWell && (
+        <>
+          <SummaryCards wells={wells} />
+
+          <section className="layout">
+            <WellTable
+              wells={wells}
+              selectedWell={selectedWell}
+              onSelectWell={setSelectedWell}
+            />
+
+            <WellDetail selectedWell={selectedWell} />
+          </section>
+
+          <section className="panel history-panel">
+            {isLoadingHistory && <p>Loading production history...</p>}
+
+            {historyError && <p>{historyError}</p>}
+
+            {!isLoadingHistory && !historyError && (
+              <ProductionHistoryTable history={productionHistory} />
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }
