@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import SummaryCards from '../components/SummaryCards'
 import WellTable from '../components/WellTable'
 import WellDetail from '../components/WellDetail'
-import ProductionHistoryTable from '../components/ProductionHistoryTable'
 import ProductionHistoryChart from '../components/ProductionHistoryChart'
 import WaterCutChart from '../components/WaterCutChart'
 import GorChart from '../components/GorChart'
+import ReservoirContributionChart from '../components/ReservoirContributionChart'
+import ProductionHistoryTable from '../components/ProductionHistoryTable'
 
 function FieldDashboard({
   field,
@@ -20,6 +21,10 @@ function FieldDashboard({
   const [productionHistory, setProductionHistory] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState('')
+
+  const [reservoirHistory, setReservoirHistory] = useState([])
+  const [isLoadingReservoirHistory, setIsLoadingReservoirHistory] = useState(false)
+  const [reservoirHistoryError, setReservoirHistoryError] = useState('')
 
   useEffect(() => {
     if (wells.length > 0) {
@@ -52,6 +57,28 @@ function FieldDashboard({
       })
       .finally(() => {
         setIsLoadingHistory(false)
+      })
+
+    setIsLoadingReservoirHistory(true)
+    setReservoirHistoryError('')
+
+    fetch(`/api/wells/${selectedWell.id}/reservoir-history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load reservoir history')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setReservoirHistory(data)
+      })
+      .catch(() => {
+        setReservoirHistory([])
+        setReservoirHistoryError('Unable to load reservoir history')
+      })
+      .finally(() => {
+        setIsLoadingReservoirHistory(false)
       })
   }, [selectedWell])
 
@@ -102,10 +129,25 @@ function FieldDashboard({
 
             {!isLoadingHistory && !historyError && (
               <>
-              <ProductionHistoryChart history={productionHistory} />
-              <WaterCutChart history={productionHistory} />
-              <GorChart history={productionHistory} />
-              <ProductionHistoryTable history={productionHistory} />
+                <ProductionHistoryChart history={productionHistory} />
+                <WaterCutChart history={productionHistory} />
+                <GorChart history={productionHistory} />
+
+                {isLoadingReservoirHistory && (
+                  <p>Loading reservoir contribution...</p>
+                )}
+
+                {reservoirHistoryError && (
+                  <p>{reservoirHistoryError}</p>
+                )}
+
+                {!isLoadingReservoirHistory && !reservoirHistoryError && (
+                  <ReservoirContributionChart
+                    reservoirHistory={reservoirHistory}
+                  />
+                )}
+
+                <ProductionHistoryTable history={productionHistory} />
               </>
             )}
           </section>

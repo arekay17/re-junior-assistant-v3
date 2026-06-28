@@ -41,7 +41,7 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
   SELECT
     w.id,
     w.name,
-    GROUP_CONCAT(DISTINCT r.name) AS reservoirs,
+    GROUP_CONCAT(DISTINCT r.name || ' / ' || fb.name) AS reservoirFaultBlocks,
     SUM(mpa.oil_volume_stb) AS oilVolumeStb,
     SUM(mpa.water_volume_stb) AS waterVolumeStb,
     SUM(mpa.gas_volume_mscf) AS gasVolumeMscf,
@@ -61,6 +61,8 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
     AND mpa.production_month = latest.latest_month
   LEFT JOIN reservoirs r
     ON r.id = mpa.reservoir_id
+  LEFT JOIN fault_blocks fb
+    ON fb.id = mpa.fault_block_id
   LEFT JOIN well_monthly_status wms
     ON wms.well_id = w.id
     AND wms.production_month = latest.latest_month
@@ -112,7 +114,7 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
     return {
       id: well.id,
       name: well.name,
-      reservoir: well.reservoirs || '-',
+      reservoir: well.reservoirFaultBlocks || '-',
       oilRate: Math.round(oilRateProdDays),
       oilRateCalendarDays: Math.round(oilRateCalendarDays),
       waterCut: Math.round(waterCut),
@@ -186,6 +188,42 @@ app.get('/api/wells/:wellId/history', (req, res) => {
   })
 
   res.json(history)
+})
+
+app.get('/api/wells/:wellId/reservoir-history', (req, res) => {
+  const wellId = req.params.wellId
+
+  const rows = db.prepare(`
+    SELECT
+      r.name AS reservoir,
+      fb.name AS faultBlock,
+      mpa.production_month AS productionMonth,
+      mpa.oil_volume_stb AS oilVolumeStb,
+      mpa.water_volume_stb AS waterVolumeStb,
+      mpa.gas_volume_mscf AS gasVolumeMscf
+    FROM monthly_production_allocations mpa
+    INNER JOIN reservoirs r
+      ON r.id = mpa.reservoir_id
+    INNER JOIN fault_blocks fb
+      ON fb.id = mpa.fault_block_id
+    WHERE mpa.well_id = ?
+    ORDER BY
+      r.name,
+      fb.name,
+      mpa.production_month
+  `).all(wellId)
+
+  res.json(
+    rows.map((row) => ({
+      reservoir: row.reservoir,
+      faultBlock: row.faultBlock,
+      reservoirFaultBlock: `${row.reservoir} - ${row.faultBlock}`,
+      month: row.productionMonth,
+      oilVolumeStb: Math.round(row.oilVolumeStb),
+      waterVolumeStb: Math.round(row.waterVolumeStb),
+      gasVolumeMscf: Math.round(row.gasVolumeMscf),
+    }))
+  )
 })
 
 app.listen(4000, () => {
