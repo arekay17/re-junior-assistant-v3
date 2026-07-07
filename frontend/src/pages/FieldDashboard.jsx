@@ -12,31 +12,72 @@ function FieldDashboard({
   onBack,
 }) {
   const [activeView, setActiveView] = useState('field')
-  const [selectedWell, setSelectedWell] = useState(null)
+
+  const [selectedProducer, setSelectedProducer] = useState(null)
+  const [selectedInjector, setSelectedInjector] = useState(null)
 
   const [productionHistory, setProductionHistory] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState('')
 
   const [reservoirHistory, setReservoirHistory] = useState([])
-  const [isLoadingReservoirHistory, setIsLoadingReservoirHistory] = useState(false)
+  const [isLoadingReservoirHistory, setIsLoadingReservoirHistory] =
+    useState(false)
   const [reservoirHistoryError, setReservoirHistoryError] = useState('')
+
+  const [injectors, setInjectors] = useState([])
+  const [isLoadingInjectors, setIsLoadingInjectors] = useState(false)
+  const [injectorError, setInjectorError] = useState('')
 
   useEffect(() => {
     if (wells.length > 0) {
-      setSelectedWell(wells[0])
+      setSelectedProducer(wells[0])
     }
   }, [wells])
 
   useEffect(() => {
-    if (!selectedWell) {
+    if (injectors.length > 0) {
+      setSelectedInjector(injectors[0])
+    }
+  }, [injectors])
+
+  useEffect(() => {
+    if (!field) {
+      return
+    }
+
+    setIsLoadingInjectors(true)
+    setInjectorError('')
+
+    fetch(`/api/fields/${field.id}/injectors`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load injectors')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setInjectors(data)
+      })
+      .catch(() => {
+        setInjectors([])
+        setInjectorError('Unable to load injectors')
+      })
+      .finally(() => {
+        setIsLoadingInjectors(false)
+      })
+  }, [field])
+
+  useEffect(() => {
+    if (!selectedProducer) {
       return
     }
 
     setIsLoadingHistory(true)
     setHistoryError('')
 
-    fetch(`/api/wells/${selectedWell.id}/history`)
+    fetch(`/api/wells/${selectedProducer.id}/history`)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to load history')
@@ -58,7 +99,7 @@ function FieldDashboard({
     setIsLoadingReservoirHistory(true)
     setReservoirHistoryError('')
 
-    fetch(`/api/wells/${selectedWell.id}/reservoir-history`)
+    fetch(`/api/wells/${selectedProducer.id}/reservoir-history`)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to load reservoir history')
@@ -76,7 +117,7 @@ function FieldDashboard({
       .finally(() => {
         setIsLoadingReservoirHistory(false)
       })
-  }, [selectedWell])
+  }, [selectedProducer])
 
   return (
     <main className="app">
@@ -137,17 +178,22 @@ function FieldDashboard({
       {!isLoadingWells &&
         !wellsError &&
         activeView === 'well' &&
-        selectedWell && (
+        selectedProducer && (
           <WellView
             wells={wells}
-            selectedWell={selectedWell}
-            setSelectedWell={setSelectedWell}
+            selectedProducer={selectedProducer}
+            setSelectedProducer={setSelectedProducer}
             productionHistory={productionHistory}
             isLoadingHistory={isLoadingHistory}
             historyError={historyError}
             reservoirHistory={reservoirHistory}
             isLoadingReservoirHistory={isLoadingReservoirHistory}
             reservoirHistoryError={reservoirHistoryError}
+            injectors={injectors}
+            selectedInjector={selectedInjector}
+            setSelectedInjector={setSelectedInjector}
+            isLoadingInjectors={isLoadingInjectors}
+            injectorError={injectorError}
           />
         )}
 
