@@ -7,6 +7,8 @@ import FieldWaterCutChart from '../components/FieldWaterCutChart'
 import FieldGorChart from '../components/FieldGorChart'
 import FieldWellLists from '../components/FieldWellLists'
 import SurveillanceCandidates from '../components/SurveillanceCandidates'
+import FieldWaterInjectionChart from '../components/FieldWaterInjectionChart'
+import FieldGasInjectionChart from '../components/FieldGasInjectionChart'
 
 function FieldView({ field, wells }) {
   const [fieldHistory, setFieldHistory] = useState([])
@@ -15,6 +17,9 @@ function FieldView({ field, wells }) {
   const [injectors, setInjectors] = useState([])
   const [isLoadingInjectors, setIsLoadingInjectors] = useState(false)
   const [injectorError, setInjectorError] = useState('')
+  const [injectionHistory, setInjectionHistory] = useState([])
+  const [isLoadingInjectionHistory, setIsLoadingInjectionHistory] = useState(false)
+  const [injectionHistoryError, setInjectionHistoryError] = useState('')
 
   useEffect(() => {
     setIsLoading(true)
@@ -60,6 +65,28 @@ function FieldView({ field, wells }) {
       .finally(() => {
         setIsLoadingInjectors(false)
       })
+    
+    setIsLoadingInjectionHistory(true)
+    setInjectionHistoryError('')
+
+    fetch(`/api/fields/${field.id}/injection-history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load injection history')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setInjectionHistory(data)
+      })
+      .catch(() => {
+        setInjectionHistory([])
+        setInjectionHistoryError('Unable to load injection history')
+      })
+      .finally(() => {
+        setIsLoadingInjectionHistory(false)
+      })
 
   }, [field])
 
@@ -80,6 +107,7 @@ function FieldView({ field, wells }) {
         )}
 
         <section className="panel">
+          <h3>Production Performance</h3>
           {isLoading && <p>Loading field history...</p>}
           {error && <p>{error}</p>}
 
@@ -91,6 +119,22 @@ function FieldView({ field, wells }) {
             </>
           )}
         </section>
+
+        <section className="panel">
+          <h3>Injection Performance</h3>
+
+          {isLoadingInjectionHistory && <p>Loading injection history...</p>}
+
+          {injectionHistoryError && <p>{injectionHistoryError}</p>}
+
+          {!isLoadingInjectionHistory && !injectionHistoryError && (
+            <>
+              <FieldWaterInjectionChart history={injectionHistory} />
+              <FieldGasInjectionChart history={injectionHistory} />
+            </>
+          )}
+        </section>
+        
       </section>
 
       <section className="field-section">
