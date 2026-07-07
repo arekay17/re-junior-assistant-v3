@@ -46,6 +46,7 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
     SUM(mpa.water_volume_stb) AS waterVolumeStb,
     SUM(mpa.gas_volume_mscf) AS gasVolumeMscf,
     wms.production_days AS productionDays,
+    wms.idle_reason AS idleReason,
     latest.latest_month AS productionMonth
   FROM wells w
   LEFT JOIN (
@@ -66,11 +67,12 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
   LEFT JOIN well_monthly_status wms
     ON wms.well_id = w.id
     AND wms.production_month = latest.latest_month
-  WHERE w.field_id = ?
+  WHERE w.field_id = ? AND w.well_role = 'Producer'
   GROUP BY
     w.id,
     w.name,
     wms.production_days,
+    wms.idle_reason,
     latest.latest_month
   ORDER BY w.name
   `).all(fieldId)
@@ -103,9 +105,21 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
         ? well.gasVolumeMscf * 1000 / well.oilVolumeStb
         : 0
 
+    const totalVolume =
+      (well.oilVolumeStb || 0) +
+      (well.waterVolumeStb || 0) +
+      (well.gasVolumeMscf || 0)
+
+    const activityStatus =
+      totalVolume > 0 && well.productionDays > 0
+        ? 'Active'
+        : 'Idle'
+
     let status = 'Normal'
 
-    if (waterCut >= 60) {
+    if (activityStatus === 'Idle') {
+      status = 'Idle'
+    } else if (waterCut >= 60) {
       status = 'High water cut'
     } else if (gor >= 1500) {
       status = 'High GOR'
@@ -120,6 +134,10 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
       waterCut: Math.round(waterCut),
       gor: Math.round(gor),
       status,
+
+      productionDays: well.productionDays,
+      activityStatus,
+      idleReason: activityStatus === 'Idle' ? well.idleReason || 'Unknown' : null,
     }
   })
 
@@ -224,6 +242,157 @@ app.get('/api/wells/:wellId/reservoir-history', (req, res) => {
       gasVolumeMscf: Math.round(row.gasVolumeMscf),
     }))
   )
+})
+
+app.get('/api/fields/:fieldId/history', (req, res) => {
+  const fieldId = req.params.fieldId
+
+  const rows = db.prepare(`
+    SELECT
+      mpa.production_month AS productionMonth,
+      SUM(mpa.oil_volume_stb) AS oilVolumeStb,
+      SUM(mpa.water_volume_stb) AS waterVolumeStb,
+      SUM(mpa.gas_volume_mscf) AS gasVolumeMscf,
+      SUM(wms.production_days) AS totalProductionDays
+    FROM monthly_production_allocations mpa
+    INNER JOIN wells w
+      ON w.id = mpa.well_id
+    INNER JOIN well_monthly_status wms
+      ON wms.well_id = mpa.well_id
+      AND wms.production_month = mpa.production_month
+    WHERE w.field_id = ?
+    GROUP BY mpa.production_month
+    ORDER BY mpa.production_month
+  `).all(fieldId)
+
+  let cumulativeOilStb = 0
+
+  const history = rows.map((row) => {
+    const calendarDays = getCalendarDays(row.productionMonth)
+
+    cumulativeOilStb += row.oilVolumeStb || 0
+
+    const liquidVolume =
+      (row.oilVolumeStb || 0) + (row.waterVolumeStb || 0)
+
+    const oilRateCalendarDays =
+      calendarDays > 0
+        ? row.oilVolumeStb / calendarDays
+        : 0
+
+    const waterCut =
+      liquidVolume > 0
+        ? (row.waterVolumeStb / liquidVolume) * 100
+        : 0
+
+    const gorScfStb =
+      row.oilVolumeStb > 0
+        ? (row.gasVolumeMscf * 1000) / row.oilVolumeStb
+        : 0
+
+    return {
+      month: row.productionMonth,
+      oilVolumeStb: Math.round(row.oilVolumeStb),
+      waterVolumeStb: Math.round(row.waterVolumeStb),
+      gasVolumeMscf: Math.round(row.gasVolumeMscf),
+      oilRateCalendarDays: Math.round(oilRateCalendarDays),
+      waterCut: Math.round(waterCut),
+      gorScfStb: Math.round(gorScfStb),
+      cumulativeOilStb: Math.round(cumulativeOilStb),
+    }
+  })
+
+  res.json(history)
+})
+
+app.get('/api/fields/:fieldId/injectors', (req, res) => {
+  const fieldId = req.params.fieldId
+
+  const injectors = db.prepare(`
+    SELECT
+      w.id,
+      w.name,
+      w.injector_type AS injectorType,
+      GROUP_CONCAT(DISTINCT r.name || ' / ' || fb.name) AS reservoirFaultBlocks,
+      SUM(mia.water_injection_bbl) AS waterInjectionBbl,
+      SUM(mia.gas_injection_mscf) AS gasInjectionMscf,
+      wms.production_days AS injectionDays,
+      latest.latest_month AS productionMonth,
+      wms.idle_reason AS idleReason
+    FROM wells w
+    LEFT JOIN (
+      SELECT
+        well_id,
+        MAX(production_month) AS latest_month
+      FROM monthly_injection_allocations
+      GROUP BY well_id
+    ) latest
+      ON latest.well_id = w.id
+    LEFT JOIN monthly_injection_allocations mia
+      ON mia.well_id = w.id
+      AND mia.production_month = latest.latest_month
+    LEFT JOIN reservoirs r
+      ON r.id = mia.reservoir_id
+    LEFT JOIN fault_blocks fb
+      ON fb.id = mia.fault_block_id
+    LEFT JOIN well_monthly_status wms
+      ON wms.well_id = w.id
+      AND wms.production_month = latest.latest_month
+    WHERE w.field_id = ?
+      AND w.well_role = 'Injector'
+    GROUP BY
+      w.id,
+      w.name,
+      w.injector_type,
+      wms.production_days,
+      wms.idle_reason,
+      latest.latest_month
+    ORDER BY w.name
+  `).all(fieldId)
+
+  const result = injectors.map((well) => {
+    const calendarDays = well.productionMonth
+      ? getCalendarDays(well.productionMonth)
+      : 0
+
+    const totalInjection =
+      (well.waterInjectionBbl || 0) + (well.gasInjectionMscf || 0)
+
+    const activityStatus =
+      totalInjection > 0 && well.injectionDays > 0
+        ? 'Active'
+        : 'Idle'
+
+    return {
+      id: well.id,
+      name: well.name,
+      injectorType: well.injectorType,
+      reservoir: well.reservoirFaultBlocks || '-',
+      waterInjectionBbl: Math.round(well.waterInjectionBbl || 0),
+      gasInjectionMscf: Math.round(well.gasInjectionMscf || 0),
+      waterInjectionRate:
+        well.injectionDays > 0
+          ? Math.round((well.waterInjectionBbl || 0) / well.injectionDays)
+          : 0,
+      gasInjectionRate:
+        well.injectionDays > 0
+          ? Math.round((well.gasInjectionMscf || 0) / well.injectionDays)
+          : 0,
+      waterInjectionCalendarRate:
+        calendarDays > 0
+          ? Math.round((well.waterInjectionBbl || 0) / calendarDays)
+          : 0,
+      gasInjectionCalendarRate:
+        calendarDays > 0
+          ? Math.round((well.gasInjectionMscf || 0) / calendarDays)
+          : 0,
+      injectionDays: well.injectionDays || 0,
+      activityStatus,
+      idleReason: activityStatus === 'Idle' ? well.idleReason || 'Unknown' : null,
+    }
+  })
+
+  res.json(result)
 })
 
 app.listen(4000, () => {

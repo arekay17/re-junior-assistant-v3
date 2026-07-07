@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import SummaryCards from '../components/SummaryCards'
-import WellTable from '../components/WellTable'
-import WellDetail from '../components/WellDetail'
-import ProductionHistoryChart from '../components/ProductionHistoryChart'
-import WaterCutChart from '../components/WaterCutChart'
-import GorChart from '../components/GorChart'
-import ReservoirContributionChart from '../components/ReservoirContributionChart'
-import ProductionHistoryTable from '../components/ProductionHistoryTable'
+import FieldView from '../views/FieldView'
+import WellView from '../views/WellView'
+import ReservoirView from '../views/ReservoirView'
 
 function FieldDashboard({
   field,
@@ -16,6 +11,7 @@ function FieldDashboard({
   wellsError,
   onBack,
 }) {
+  const [activeView, setActiveView] = useState('field')
   const [selectedWell, setSelectedWell] = useState(null)
 
   const [productionHistory, setProductionHistory] = useState([])
@@ -92,9 +88,35 @@ function FieldDashboard({
         <p className="eyebrow">Reservoir Engineering</p>
         <h1>{field.name} Dashboard</h1>
         <p className="subtitle">
-          First mock dashboard for well surveillance review.
+          Select a surveillance view for field, well, or reservoir analysis.
         </p>
       </header>
+
+      <section className="view-tabs">
+        <button
+          type="button"
+          className={activeView === 'field' ? 'active-tab' : ''}
+          onClick={() => setActiveView('field')}
+        >
+          Field View
+        </button>
+
+        <button
+          type="button"
+          className={activeView === 'well' ? 'active-tab' : ''}
+          onClick={() => setActiveView('well')}
+        >
+          Well View
+        </button>
+
+        <button
+          type="button"
+          className={activeView === 'reservoir' ? 'active-tab' : ''}
+          onClick={() => setActiveView('reservoir')}
+        >
+          Reservoir View
+        </button>
+      </section>
 
       {isLoadingWells && (
         <div className="panel">
@@ -108,50 +130,29 @@ function FieldDashboard({
         </div>
       )}
 
-      {!isLoadingWells && !wellsError && selectedWell && (
-        <>
-          <SummaryCards wells={wells} />
+      {!isLoadingWells && !wellsError && activeView === 'field' && (
+        <FieldView field={field} wells={wells} />
+      )}
 
-          <section className="layout">
-            <WellTable
-              wells={wells}
-              selectedWell={selectedWell}
-              onSelectWell={setSelectedWell}
-            />
+      {!isLoadingWells &&
+        !wellsError &&
+        activeView === 'well' &&
+        selectedWell && (
+          <WellView
+            wells={wells}
+            selectedWell={selectedWell}
+            setSelectedWell={setSelectedWell}
+            productionHistory={productionHistory}
+            isLoadingHistory={isLoadingHistory}
+            historyError={historyError}
+            reservoirHistory={reservoirHistory}
+            isLoadingReservoirHistory={isLoadingReservoirHistory}
+            reservoirHistoryError={reservoirHistoryError}
+          />
+        )}
 
-            <WellDetail selectedWell={selectedWell} />
-          </section>
-
-          <section className="panel history-panel">
-            {isLoadingHistory && <p>Loading production history...</p>}
-
-            {historyError && <p>{historyError}</p>}
-
-            {!isLoadingHistory && !historyError && (
-              <>
-                <ProductionHistoryChart history={productionHistory} />
-                <WaterCutChart history={productionHistory} />
-                <GorChart history={productionHistory} />
-
-                {isLoadingReservoirHistory && (
-                  <p>Loading reservoir contribution...</p>
-                )}
-
-                {reservoirHistoryError && (
-                  <p>{reservoirHistoryError}</p>
-                )}
-
-                {!isLoadingReservoirHistory && !reservoirHistoryError && (
-                  <ReservoirContributionChart
-                    reservoirHistory={reservoirHistory}
-                  />
-                )}
-
-                <ProductionHistoryTable history={productionHistory} />
-              </>
-            )}
-          </section>
-        </>
+      {!isLoadingWells && !wellsError && activeView === 'reservoir' && (
+        <ReservoirView field={field} />
       )}
     </main>
   )
