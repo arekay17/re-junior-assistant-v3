@@ -437,6 +437,65 @@ app.get('/api/fields/:fieldId/injection-history', (req, res) => {
   res.json(history)
 })
 
+app.get('/api/injectors/:injectorId/history', (req, res) => {
+  const injectorId = req.params.injectorId
+
+  const rows = db.prepare(`
+    SELECT
+      mia.production_month AS productionMonth,
+      SUM(mia.water_injection_bbl) AS waterInjectionBbl,
+      SUM(mia.gas_injection_mscf) AS gasInjectionMscf,
+      wms.production_days AS injectionDays
+    FROM monthly_injection_allocations mia
+    LEFT JOIN well_monthly_status wms
+      ON wms.well_id = mia.well_id
+      AND wms.production_month = mia.production_month
+    WHERE mia.well_id = ?
+    GROUP BY
+      mia.production_month,
+      wms.production_days
+    ORDER BY mia.production_month
+  `).all(injectorId)
+
+  const history = rows.map((row) => {
+    const calendarDays = getCalendarDays(row.productionMonth)
+
+    const waterInjectionRate =
+      row.injectionDays > 0
+        ? row.waterInjectionBbl / row.injectionDays
+        : 0
+
+    const gasInjectionRate =
+      row.injectionDays > 0
+        ? row.gasInjectionMscf / row.injectionDays
+        : 0
+
+    const waterInjectionCalendarRate =
+      calendarDays > 0
+        ? row.waterInjectionBbl / calendarDays
+        : 0
+
+    const gasInjectionCalendarRate =
+      calendarDays > 0
+        ? row.gasInjectionMscf / calendarDays
+        : 0
+
+    return {
+      month: row.productionMonth,
+      waterInjectionBbl: Math.round(row.waterInjectionBbl || 0),
+      gasInjectionMscf: Math.round(row.gasInjectionMscf || 0),
+      injectionDays: row.injectionDays || 0,
+      calendarDays,
+      waterInjectionRate: Math.round(waterInjectionRate),
+      gasInjectionRate: Math.round(gasInjectionRate),
+      waterInjectionCalendarRate: Math.round(waterInjectionCalendarRate),
+      gasInjectionCalendarRate: Math.round(gasInjectionCalendarRate),
+    }
+  })
+
+  res.json(history)
+})
+
 app.listen(4000, () => {
   console.log('Server running on port 4000')
 })

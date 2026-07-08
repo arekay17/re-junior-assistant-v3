@@ -6,6 +6,11 @@ import WaterCutChart from '../components/WaterCutChart'
 import GorChart from '../components/GorChart'
 import ReservoirContributionChart from '../components/ReservoirContributionChart'
 import ProductionHistoryTable from '../components/ProductionHistoryTable'
+import InjectorTable from '../components/InjectorTable'
+import InjectorDetail from '../components/InjectorDetail'
+import WaterInjectionHistoryChart from '../components/WaterInjectionHistoryChart'
+import GasInjectionHistoryChart from '../components/GasInjectionHistoryChart'
+import InjectionHistoryTable from '../components/InjectionHistoryTable'
 
 function WellView({
   wells,
@@ -22,6 +27,9 @@ function WellView({
   setSelectedInjector,
   isLoadingInjectors,
   injectorError,
+  injectionHistory,
+  isLoadingInjectionHistory,
+  injectionHistoryError,
 }) {
   const [wellMode, setWellMode] = useState('producers')
 
@@ -88,39 +96,41 @@ function WellView({
       )}
 
       {wellMode === 'injectors' && (
-        <section className="panel">
-          <h2>Injector View</h2>
+        <>
+          <section className="layout">
+            {isLoadingInjectors && <p>Loading injectors...</p>}
 
-          {isLoadingInjectors && <p>Loading injectors...</p>}
+            {injectorError && <p>{injectorError}</p>}
 
-          {injectorError && <p>{injectorError}</p>}
+            {!isLoadingInjectors && !injectorError && (
+              <>
+                <InjectorTable
+                  injectors={injectors}
+                  selectedInjector={selectedInjector}
+                  onSelectInjector={setSelectedInjector}
+                />
 
-          {!isLoadingInjectors && !injectorError && (
-            <>
-              <p>
-                Selected injector:{' '}
-                <strong>{selectedInjector ? selectedInjector.name : '-'}</strong>
-              </p>
+                <InjectorDetail
+                  selectedInjector={selectedInjector}
+                />
+              </>
+            )}
+          </section>
 
-              <p>
-                Injector table and injection trends will be added here next.
-              </p>
+          <section className="panel history-panel">
+            {isLoadingInjectionHistory && <p>Loading injection history...</p>}
 
-              <ul>
-                {injectors.map((injector) => (
-                  <li key={injector.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedInjector(injector)}
-                    >
-                      {injector.name} — {injector.injectorType}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
+            {injectionHistoryError && <p>{injectionHistoryError}</p>}
+
+            {!isLoadingInjectionHistory && !injectionHistoryError && (
+              <>
+                <WaterInjectionHistoryChart history={injectionHistory} />
+                <GasInjectionHistoryChart history={injectionHistory} />
+                <InjectionHistoryTable history={injectionHistory} />
+              </>
+            )}
+          </section>
+        </>
       )}
     </>
   )

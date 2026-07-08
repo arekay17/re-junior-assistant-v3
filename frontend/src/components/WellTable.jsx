@@ -5,7 +5,7 @@ function WellTable({
 }) {
   return (
     <div className="panel">
-      <h2>Well List</h2>
+      <h2>Producer Wells</h2>
 
       <table>
         <thead>
