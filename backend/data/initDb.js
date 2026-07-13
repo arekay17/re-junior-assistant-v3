@@ -6,6 +6,7 @@ db.exec(`
   DROP TABLE IF EXISTS monthly_injection_allocations;
   DROP TABLE IF EXISTS monthly_production_allocations;
   DROP TABLE IF EXISTS well_monthly_status;
+  DROP TABLE IF EXISTS reservoir_pressure_surveys;
   DROP TABLE IF EXISTS fault_blocks;
   DROP TABLE IF EXISTS reservoirs;
   DROP TABLE IF EXISTS wells;
@@ -26,11 +27,30 @@ db.exec(`
     FOREIGN KEY (field_id) REFERENCES fields(id)
   );
 
-  CREATE TABLE reservoirs (
+CREATE TABLE reservoirs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     field_id TEXT NOT NULL,
     name TEXT NOT NULL,
+    stoiip_mmstb REAL,
+    giip_bscf REAL,
+    gas_cap_m REAL,
+    initial_pressure_psia REAL,
+    drive_mechanism TEXT,
+    fluid_type TEXT,
+    temperature_f REAL,
     FOREIGN KEY (field_id) REFERENCES fields(id)
+  );
+
+CREATE TABLE reservoir_pressure_surveys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reservoir_id INTEGER NOT NULL,
+    well_id INTEGER NOT NULL,
+    survey_date TEXT NOT NULL,
+    pressure_psia REAL NOT NULL,
+    survey_type TEXT NOT NULL,
+    remarks TEXT,
+    FOREIGN KEY (reservoir_id) REFERENCES reservoirs(id),
+    FOREIGN KEY (well_id) REFERENCES wells(id)
   );
 
   CREATE TABLE fault_blocks (
@@ -116,26 +136,46 @@ for (const well of wells) {
 }
 
 const insertReservoir = db.prepare(`
-  INSERT INTO reservoirs (field_id, name)
-  VALUES (?, ?)
+  INSERT INTO reservoirs (
+    field_id,
+    name,
+    stoiip_mmstb,
+    giip_bscf,
+    gas_cap_m,
+    initial_pressure_psia,
+    drive_mechanism,
+    fluid_type,
+    temperature_f
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `)
 
 const reservoirs = [
-  ['tapis', 'E34'],
-  ['tapis', 'E40A'],
-  ['tapis', 'E22B'],
+  ['tapis', 'E34', 52, 18, 0.18, 3120, 'WAG support', 'Oil', 185],
+  ['tapis', 'E40A', 43, 12, 0.1, 3050, 'Gas cap expansion', 'Oil', 180],
+  ['tapis', 'E22B', 27, 9, 0.05, 2980, 'Water injection support', 'Oil', 176],
 
-  ['irong-barat', 'R1'],
-  ['irong-barat', 'R2'],
-  ['irong-barat', 'R3'],
+  ['irong-barat', 'R1', 35, 5, 0.02, 2850, 'Natural depletion', 'Oil', 170],
+  ['irong-barat', 'R2', 42, 7, 0.04, 2920, 'Water drive', 'Oil', 174],
+  ['irong-barat', 'R3', 31, 4, 0.01, 2880, 'Natural depletion', 'Oil', 172],
 
-  ['semangkok', 'E12'],
-  ['semangkok', 'E20'],
-  ['semangkok', 'E25'],
+  ['semangkok', 'E12', 29, 6, 0.03, 2760, 'Water drive', 'Oil', 168],
+  ['semangkok', 'E20', 38, 11, 0.12, 3010, 'Gas cap expansion', 'Oil', 182],
+  ['semangkok', 'E25', 24, 3, 0.02, 2680, 'Natural depletion', 'Oil', 165],
 ]
 
 for (const reservoir of reservoirs) {
-  insertReservoir.run(reservoir[0], reservoir[1])
+    insertReservoir.run(
+    reservoir[0],
+    reservoir[1],
+    reservoir[2],
+    reservoir[3],
+    reservoir[4],
+    reservoir[5],
+    reservoir[6],
+    reservoir[7],
+    reservoir[8]
+  )
 }
 
 const insertFaultBlock = db.prepare(`
@@ -167,6 +207,18 @@ const getWell = db.prepare(`
 const getReservoir = db.prepare(`
   SELECT id FROM reservoirs
   WHERE name = ?
+`)
+
+const insertPressureSurvey = db.prepare(`
+  INSERT INTO reservoir_pressure_surveys (
+    reservoir_id,
+    well_id,
+    survey_date,
+    pressure_psia,
+    survey_type,
+    remarks
+  )
+  VALUES (?, ?, ?, ?, ?, ?)
 `)
 
 const getFaultBlock = db.prepare(`
@@ -275,6 +327,27 @@ function addThreeMonths(
     baseWater * 1.25,
     baseGas * 1.1,
     productionDays + 1
+  )
+}
+
+function addPressureSurvey(
+  reservoirName,
+  wellName,
+  surveyDate,
+  pressurePsia,
+  surveyType,
+  remarks = null
+) {
+  const reservoir = getReservoir.get(reservoirName)
+  const well = getWell.get(wellName)
+
+  insertPressureSurvey.run(
+    reservoir.id,
+    well.id,
+    surveyDate,
+    pressurePsia,
+    surveyType,
+    remarks
   )
 }
 
@@ -399,5 +472,22 @@ addInjectionThreeMonths('IBWI-01', 'R2', 'FB-1', 220000, 0, 27)
 // Semangkok Injector
 addInjectionThreeMonths('SMKGI-01', 'E20', 'FB-North', 0, 120000, 25)
 
+// Tapis pressure surveys
+addPressureSurvey('E34', 'TP-01', '2019-01-15', 3115, 'PBU', 'Baseline pressure')
+addPressureSurvey('E34', 'TP-02', '2021-06-10', 3045, 'SGS', 'Static gradient survey')
+addPressureSurvey('E34', 'TP-01', '2023-09-18', 2998, 'PBU', 'Post WAG review')
+addPressureSurvey('E34', 'TP-03', '2026-03-20', 2955, 'RFT', 'Latest surveillance point')
+
+addPressureSurvey('E40A', 'TP-01', '2019-02-12', 3048, 'PBU', 'Baseline pressure')
+addPressureSurvey('E40A', 'TP-01', '2021-08-22', 2995, 'SGS', 'Gradient survey')
+addPressureSurvey('E40A', 'TP-02', '2024-01-11', 2920, 'PBU', 'Decline monitoring')
+addPressureSurvey('E40A', 'TP-01', '2026-03-15', 2875, 'RFT', 'Latest pressure point')
+
+addPressureSurvey('E22B', 'TP-02', '2019-03-05', 2975, 'PBU', 'Baseline pressure')
+addPressureSurvey('E22B', 'TP-03', '2021-04-18', 2910, 'SGS', 'Static survey')
+addPressureSurvey('E22B', 'TP-02', '2023-11-09', 2865, 'PBU', 'Surveillance update')
+addPressureSurvey('E22B', 'TP-03', '2026-02-28', 2810, 'RFT', 'Latest pressure point')
 
 console.log('Database initialized successfully')
+
+
