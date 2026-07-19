@@ -638,6 +638,24 @@ app.get('/api/fields/:fieldId/field-production', (req, res) => {
   }
 })
 
+app.get('/api/fields/:fieldId/compartment-injection', (req, res) => {
+  const fieldId = req.params.fieldId
+
+  const result =
+    productionQueries.getCompartmentInjection(fieldId)
+
+  res.json(result)
+})
+
+app.get('/api/fields/:fieldId/field-injection', (req, res) => {
+  const fieldId = req.params.fieldId
+
+  const result =
+    productionQueries.getFieldInjection(fieldId)
+
+  res.json(result)
+})
+
 app.listen(4000, () => {
   console.log('Server running on port 4000')
 })

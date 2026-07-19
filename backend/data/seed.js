@@ -231,6 +231,15 @@ function seedDatabase(db) {
   db.addWellString('TP-03', 'TP-03L', 'Long String')
 
   // =========================================================
+  // Well strings: Tapis injectors
+  // =========================================================
+
+  db.addWellString('TWI-01', 'TWI-01S', 'Water Injection String')
+  db.addWellString('TGI-01', 'TGI-01S', 'Gas Injection String')
+  db.addWellString('TWAG-01', 'TWAG-01S', 'WAG Injection String')
+
+
+  // =========================================================
   // String production
   // String data will be added next.
   // =========================================================
@@ -266,6 +275,31 @@ function seedDatabase(db) {
   db.addStringProduction('TP-03L', '2026-01', 7000, 1200, 15000, 24)
   db.addStringProduction('TP-03L', '2026-02', 6650, 1320, 15750, 23)
   db.addStringProduction('TP-03L', '2026-03', 0, 0, 0, 0, 'Mechanical issue')
+
+  // =========================================================
+  // Monthly string injection: TWI-01
+  // =========================================================
+
+  db.addStringInjection('TWI-01S', '2026-01', 300000, 0, 28)
+  db.addStringInjection('TWI-01S', '2026-02', 285000, 0, 27)
+  db.addStringInjection('TWI-01S', '2026-03', 330000, 0, 29)
+
+  // =========================================================
+  // Monthly string injection: TGI-01
+  // =========================================================
+
+  db.addStringInjection('TGI-01S', '2026-01', 0, 150000, 27)
+  db.addStringInjection('TGI-01S', '2026-02', 0, 157500, 26)
+  db.addStringInjection('TGI-01S', '2026-03', 0, 142500, 28)
+
+  // =========================================================
+  // Monthly string injection: TWAG-01
+  // =========================================================
+
+  db.addStringInjection('TWAG-01S', '2026-01', 180000, 90000, 26)
+  db.addStringInjection('TWAG-01S', '2026-02', 171000, 94500, 25)
+  db.addStringInjection('TWAG-01S', '2026-03', 198000, 85500, 27)
+
 
   // =========================================================
   // String allocation factors
@@ -326,7 +360,34 @@ function seedDatabase(db) {
   db.addStringAllocationFactor('TP-03L', 'E22B / FB-B', '2026-01', 1.00, 'Completion', 'Single completed compartment')
   db.addStringAllocationFactor('TP-03L', 'E22B / FB-B', '2026-02', 1.00, 'Completion', 'Single completed compartment')
   db.addStringAllocationFactor('TP-03L', 'E22B / FB-B', '2026-03', 1.00, 'Completion', 'Well idle due to mechanical issue')
+
+  // =========================================================
+  // String injection allocation factors
+  // Allocation factors must total 1.0 for each string-month.
+  // =========================================================
+
+  // TWI-01S: water injection distributed between E34 compartments
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-A', '2026-01', 0.60, 'ILT', 'January injection logging interpretation')
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-B', '2026-01', 0.40, 'ILT', 'January injection logging interpretation')
+
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-A', '2026-02', 0.55, 'Engineering Estimate', 'Updated injection allocation')
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-B', '2026-02', 0.45, 'Engineering Estimate', 'Updated injection allocation')
+
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-A', '2026-03', 0.50, 'ILT', 'March injection logging interpretation')
+  db.addStringInjectionAllocationFactor('TWI-01S', 'E34 / FB-B', '2026-03', 0.50, 'ILT', 'March injection logging interpretation')
+
+  // TGI-01S: gas injection only into E40A / FB-C
+  db.addStringInjectionAllocationFactor('TGI-01S', 'E40A / FB-C', '2026-01', 1.00, 'Completion', 'Single completed compartment')
+  db.addStringInjectionAllocationFactor('TGI-01S', 'E40A / FB-C', '2026-02', 1.00, 'Completion', 'Single completed compartment')
+  db.addStringInjectionAllocationFactor('TGI-01S', 'E40A / FB-C', '2026-03', 1.00, 'Completion', 'Single completed compartment')
+
+  // TWAG-01S: WAG injection only into E22B / FB-C
+  db.addStringInjectionAllocationFactor('TWAG-01S', 'E22B / FB-C', '2026-01', 1.00, 'Completion', 'Single completed compartment')
+  db.addStringInjectionAllocationFactor('TWAG-01S', 'E22B / FB-C', '2026-02', 1.00, 'Completion', 'Single completed compartment')
+  db.addStringInjectionAllocationFactor('TWAG-01S', 'E22B / FB-C', '2026-03', 1.00, 'Completion', 'Single completed compartment')
+
 }
+
 
 module.exports = {
   seedDatabase,

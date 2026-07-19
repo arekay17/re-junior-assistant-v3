@@ -1,5 +1,7 @@
 function createSchema(db) {
   db.exec(`
+    DROP TABLE IF EXISTS monthly_string_injection_allocation_factors;
+    DROP TABLE IF EXISTS monthly_string_injection;
     DROP TABLE IF EXISTS monthly_string_allocation_factors;
     DROP TABLE IF EXISTS monthly_string_production;
     DROP TABLE IF EXISTS well_strings;
@@ -100,7 +102,38 @@ function createSchema(db) {
       UNIQUE (string_id, production_month)
     );
 
+    CREATE TABLE monthly_string_injection (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      string_id INTEGER NOT NULL,
+      production_month TEXT NOT NULL,
+      water_injection_bbl REAL NOT NULL,
+      gas_injection_mscf REAL NOT NULL,
+      injection_days REAL NOT NULL,
+      idle_reason TEXT,
+      FOREIGN KEY (string_id) REFERENCES well_strings(id),
+      UNIQUE (string_id, production_month)
+    );
+
     CREATE TABLE monthly_string_allocation_factors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      string_id INTEGER NOT NULL,
+      reservoir_compartment_id INTEGER NOT NULL,
+      production_month TEXT NOT NULL,
+      allocation_fraction REAL NOT NULL,
+      allocation_source TEXT,
+      remarks TEXT,
+      FOREIGN KEY (string_id) REFERENCES well_strings(id),
+      FOREIGN KEY (reservoir_compartment_id)
+        REFERENCES reservoir_compartments(id),
+      UNIQUE (
+        string_id,
+        reservoir_compartment_id,
+        production_month
+      ),
+      CHECK (allocation_fraction >= 0 AND allocation_fraction <= 1)
+    );
+
+    CREATE TABLE monthly_string_injection_allocation_factors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       string_id INTEGER NOT NULL,
       reservoir_compartment_id INTEGER NOT NULL,

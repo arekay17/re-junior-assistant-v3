@@ -146,8 +146,32 @@ function createDbHelpers(db) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
 
+  const insertStringInjection = db.prepare(`
+    INSERT INTO monthly_string_injection (
+      string_id,
+      production_month,
+      water_injection_bbl,
+      gas_injection_mscf,
+      injection_days,
+      idle_reason
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+
   const insertStringAllocationFactor = db.prepare(`
     INSERT INTO monthly_string_allocation_factors (
+      string_id,
+      reservoir_compartment_id,
+      production_month,
+      allocation_fraction,
+      allocation_source,
+      remarks
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+
+  const insertStringInjectionAllocationFactor = db.prepare(`
+    INSERT INTO monthly_string_injection_allocation_factors (
       string_id,
       reservoir_compartment_id,
       production_month,
@@ -420,6 +444,30 @@ function createDbHelpers(db) {
   }
 
   // =========================================================
+  // String injection helper
+  // =========================================================
+
+  function addStringInjection(
+    stringName,
+    month,
+    waterInjectionBbl,
+    gasInjectionMscf,
+    injectionDays,
+    idleReason = null
+  ) {
+    const wellString = getWellString.get(stringName)
+
+    insertStringInjection.run(
+      wellString.id,
+      month,
+      waterInjectionBbl,
+      gasInjectionMscf,
+      injectionDays,
+      idleReason
+    )
+  }
+
+  // =========================================================
   // String allocation factor helper
   // =========================================================
 
@@ -445,6 +493,32 @@ function createDbHelpers(db) {
     )
   }
 
+// =========================================================
+// String injection allocation factor helper
+// =========================================================
+
+  function addStringInjectionAllocationFactor(
+    stringName,
+    compartmentName,
+    month,
+    allocationFraction,
+    allocationSource,
+    remarks = null
+  ) {
+    const wellString = getWellString.get(stringName)
+    const compartment =
+      getReservoirCompartment.get(compartmentName)
+
+    insertStringInjectionAllocationFactor.run(
+      wellString.id,
+      compartment.id,
+      month,
+      allocationFraction,
+      allocationSource,
+      remarks
+    )
+  }
+
   // =========================================================
   // Public helpers
   // =========================================================
@@ -460,7 +534,9 @@ function createDbHelpers(db) {
     addWellString,
     addReservoirCompartment,
     addStringProduction,
+    addStringInjection,
     addStringAllocationFactor,
+    addStringInjectionAllocationFactor,
   }
 }
 

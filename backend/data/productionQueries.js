@@ -54,8 +54,68 @@ function createProductionQueries(db) {
       fb.name
   `)
 
+  const getCompartmentInjectionStatement = db.prepare(`
+    SELECT
+      r.field_id AS fieldId,
+      r.name AS reservoirName,
+      fb.name AS faultBlockName,
+      rc.id AS compartmentId,
+      rc.name AS compartmentName,
+      msi.production_month AS productionMonth,
+
+      ROUND(
+        SUM(
+          msi.water_injection_bbl *
+          msiaf.allocation_fraction
+        ),
+        2
+      ) AS waterInjectionBbl,
+
+      ROUND(
+        SUM(
+          msi.gas_injection_mscf *
+          msiaf.allocation_fraction
+        ),
+        2
+      ) AS gasInjectionMscf
+
+    FROM monthly_string_injection msi
+
+    JOIN monthly_string_injection_allocation_factors msiaf
+      ON msiaf.string_id = msi.string_id
+      AND msiaf.production_month = msi.production_month
+
+    JOIN reservoir_compartments rc
+      ON rc.id = msiaf.reservoir_compartment_id
+
+    JOIN reservoirs r
+      ON r.id = rc.reservoir_id
+
+    JOIN fault_blocks fb
+      ON fb.id = rc.fault_block_id
+
+    WHERE r.field_id = ?
+
+    GROUP BY
+      r.field_id,
+      r.name,
+      fb.name,
+      rc.id,
+      rc.name,
+      msi.production_month
+
+    ORDER BY
+      msi.production_month,
+      r.name,
+      fb.name
+  `)
+
   function getCompartmentProduction(fieldId) {
     return getCompartmentProductionStatement.all(fieldId)
+  }
+
+  function getCompartmentInjection(fieldId) {
+    return getCompartmentInjectionStatement.all(fieldId)
   }
 
   function getFieldProduction(fieldId) {
@@ -88,9 +148,45 @@ function createProductionQueries(db) {
     }))
   }
 
+  function getFieldInjection(fieldId) {
+    const compartmentRows = getCompartmentInjection(fieldId)
+
+    const injectionByMonth = {}
+
+    for (const row of compartmentRows) {
+      const month = row.productionMonth
+
+      if (!injectionByMonth[month]) {
+        injectionByMonth[month] = {
+          productionMonth: month,
+          waterInjectionBbl: 0,
+          gasInjectionMscf: 0,
+        }
+      }
+
+      injectionByMonth[month].waterInjectionBbl +=
+        row.waterInjectionBbl
+
+      injectionByMonth[month].gasInjectionMscf +=
+        row.gasInjectionMscf
+    }
+
+    return Object.values(injectionByMonth).map((row) => ({
+      ...row,
+      waterInjectionBbl: Number(
+        row.waterInjectionBbl.toFixed(2)
+      ),
+      gasInjectionMscf: Number(
+        row.gasInjectionMscf.toFixed(2)
+      ),
+    }))
+  }
+
   return {
     getCompartmentProduction,
     getFieldProduction,
+    getCompartmentInjection,
+    getFieldInjection,
   }
 }
 
