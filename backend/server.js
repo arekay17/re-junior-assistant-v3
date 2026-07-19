@@ -274,20 +274,54 @@ app.get('/api/wells/:wellId/reservoir-history', (req, res) => {
     SELECT
       r.name AS reservoir,
       fb.name AS faultBlock,
-      mpa.production_month AS productionMonth,
-      mpa.oil_volume_stb AS oilVolumeStb,
-      mpa.water_volume_stb AS waterVolumeStb,
-      mpa.gas_volume_mscf AS gasVolumeMscf
-    FROM monthly_production_allocations mpa
-    INNER JOIN reservoirs r
-      ON r.id = mpa.reservoir_id
-    INNER JOIN fault_blocks fb
-      ON fb.id = mpa.fault_block_id
-    WHERE mpa.well_id = ?
+      msp.production_month AS productionMonth,
+
+      SUM(
+        msp.oil_volume_stb *
+        msaf.allocation_fraction
+      ) AS oilVolumeStb,
+
+      SUM(
+        msp.water_volume_stb *
+        msaf.allocation_fraction
+      ) AS waterVolumeStb,
+
+      SUM(
+        msp.gas_volume_mscf *
+        msaf.allocation_fraction
+      ) AS gasVolumeMscf
+
+    FROM well_strings ws
+
+    JOIN monthly_string_production msp
+      ON msp.string_id = ws.id
+
+    JOIN monthly_string_allocation_factors msaf
+      ON msaf.string_id = msp.string_id
+      AND msaf.production_month = msp.production_month
+
+    JOIN reservoir_compartments rc
+      ON rc.id = msaf.reservoir_compartment_id
+
+    JOIN reservoirs r
+      ON r.id = rc.reservoir_id
+
+    JOIN fault_blocks fb
+      ON fb.id = rc.fault_block_id
+
+    WHERE ws.well_id = ?
+
+    GROUP BY
+      r.id,
+      r.name,
+      fb.id,
+      fb.name,
+      msp.production_month
+
     ORDER BY
       r.name,
       fb.name,
-      mpa.production_month
+      msp.production_month
   `).all(wellId)
 
   res.json(
@@ -547,19 +581,26 @@ app.get('/api/injectors/:injectorId/history', (req, res) => {
 
   const rows = db.prepare(`
     SELECT
-      mia.production_month AS productionMonth,
-      SUM(mia.water_injection_bbl) AS waterInjectionBbl,
-      SUM(mia.gas_injection_mscf) AS gasInjectionMscf,
-      wms.production_days AS injectionDays
-    FROM monthly_injection_allocations mia
-    LEFT JOIN well_monthly_status wms
-      ON wms.well_id = mia.well_id
-      AND wms.production_month = mia.production_month
-    WHERE mia.well_id = ?
+      msi.production_month AS productionMonth,
+
+      SUM(msi.water_injection_bbl) AS waterInjectionBbl,
+      SUM(msi.gas_injection_mscf) AS gasInjectionMscf,
+
+      MAX(msi.injection_days) AS injectionDays,
+      MAX(msi.idle_reason) AS idleReason
+
+    FROM well_strings ws
+
+    JOIN monthly_string_injection msi
+      ON msi.string_id = ws.id
+
+    WHERE ws.well_id = ?
+
     GROUP BY
-      mia.production_month,
-      wms.production_days
-    ORDER BY mia.production_month
+      msi.production_month
+
+    ORDER BY
+      msi.production_month
   `).all(injectorId)
 
   const history = rows.map((row) => {
