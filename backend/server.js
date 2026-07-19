@@ -1,9 +1,12 @@
 const express = require('express')
 const cors = require('cors')
 const Database = require('better-sqlite3')
+const { createProductionQueries } = require('./data/productionQueries')
 
 const app = express()
 const db = new Database('data/re-junior.db')
+
+const productionQueries = createProductionQueries(db)
 
 app.use(cors())
 app.use(express.json())
@@ -596,8 +599,43 @@ app.get('/api/fields/:fieldId/reservoir-summary', (req, res) => {
       gor: Math.round(gor),
     }
   })
-
   res.json(result)
+})
+
+app.get('/api/fields/:fieldId/compartment-production', (req, res) => {
+  try {
+    const { fieldId } = req.params
+
+    const production =
+      productionQueries.getCompartmentProduction(fieldId)
+
+    res.json(production)
+  } catch (error) {
+    console.error(
+      'Failed to load compartment production:',
+      error
+    )
+
+    res.status(500).json({
+      error: 'Failed to load compartment production',
+    })
+  }
+})
+
+app.get('/api/fields/:fieldId/field-production', (req, res) => {
+  try {
+    const data = productionQueries.getFieldProduction(
+      req.params.fieldId
+    )
+
+    res.json(data)
+  } catch (error) {
+    console.error('Failed to load field production:', error)
+
+    res.status(500).json({
+      error: 'Failed to load field production',
+    })
+  }
 })
 
 app.listen(4000, () => {
