@@ -25,7 +25,7 @@ function FieldView({ field, wells }) {
     setIsLoading(true)
     setError('')
 
-    fetch(`/api/fields/${field.id}/history`)
+    fetch(`/api/fields/${field.id}/field-production`)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to load field history')
@@ -69,7 +69,7 @@ function FieldView({ field, wells }) {
     setIsLoadingInjectionHistory(true)
     setInjectionHistoryError('')
 
-    fetch(`/api/fields/${field.id}/injection-history`)
+    fetch(`/api/fields/${field.id}/field-injection`)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to load injection history')

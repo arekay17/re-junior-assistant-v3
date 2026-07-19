@@ -37,47 +37,96 @@ app.get('/api/fields', (req, res) => {
   res.json(fields)
 })
 
-app.get('/api/fields/:fieldId/wells', (req, res) => {
-  const fieldId = req.params.fieldId
+  app.get('/api/fields/:fieldId/wells', (req, res) => {
+    const fieldId = req.params.fieldId
 
   const wells = db.prepare(`
-  SELECT
-    w.id,
-    w.name,
-    GROUP_CONCAT(DISTINCT r.name || ' / ' || fb.name) AS reservoirFaultBlocks,
-    SUM(mpa.oil_volume_stb) AS oilVolumeStb,
-    SUM(mpa.water_volume_stb) AS waterVolumeStb,
-    SUM(mpa.gas_volume_mscf) AS gasVolumeMscf,
-    wms.production_days AS productionDays,
-    wms.idle_reason AS idleReason,
-    latest.latest_month AS productionMonth
-  FROM wells w
-  LEFT JOIN (
     SELECT
-      well_id,
-      MAX(production_month) AS latest_month
-    FROM monthly_production_allocations
-    GROUP BY well_id
-  ) latest
-    ON latest.well_id = w.id
-  LEFT JOIN monthly_production_allocations mpa
-    ON mpa.well_id = w.id
-    AND mpa.production_month = latest.latest_month
-  LEFT JOIN reservoirs r
-    ON r.id = mpa.reservoir_id
-  LEFT JOIN fault_blocks fb
-    ON fb.id = mpa.fault_block_id
-  LEFT JOIN well_monthly_status wms
-    ON wms.well_id = w.id
-    AND wms.production_month = latest.latest_month
-  WHERE w.field_id = ? AND w.well_role = 'Producer'
-  GROUP BY
-    w.id,
-    w.name,
-    wms.production_days,
-    wms.idle_reason,
-    latest.latest_month
-  ORDER BY w.name
+      w.id,
+      w.name,
+
+      compartments.reservoirFaultBlocks,
+
+      production.oilVolumeStb,
+      production.waterVolumeStb,
+      production.gasVolumeMscf,
+      production.productionDays,
+      production.idleReason,
+      production.productionMonth
+
+    FROM wells w
+
+    LEFT JOIN (
+      SELECT
+        ws.well_id,
+
+        SUM(msp.oil_volume_stb) AS oilVolumeStb,
+        SUM(msp.water_volume_stb) AS waterVolumeStb,
+        SUM(msp.gas_volume_mscf) AS gasVolumeMscf,
+
+        MAX(msp.production_days) AS productionDays,
+        MAX(msp.idle_reason) AS idleReason,
+        msp.production_month AS productionMonth
+
+      FROM well_strings ws
+
+      JOIN monthly_string_production msp
+        ON msp.string_id = ws.id
+
+      JOIN (
+        SELECT
+          ws.well_id,
+          MAX(msp.production_month) AS latestMonth
+        FROM well_strings ws
+        JOIN monthly_string_production msp
+          ON msp.string_id = ws.id
+        GROUP BY ws.well_id
+      ) latest
+        ON latest.well_id = ws.well_id
+        AND latest.latestMonth = msp.production_month
+
+      GROUP BY
+        ws.well_id,
+        msp.production_month
+    ) production
+      ON production.well_id = w.id
+
+    LEFT JOIN (
+      SELECT
+        ws.well_id,
+
+        GROUP_CONCAT(
+          DISTINCT rc.name
+        ) AS reservoirFaultBlocks
+
+      FROM well_strings ws
+
+      JOIN monthly_string_allocation_factors msaf
+        ON msaf.string_id = ws.id
+
+      JOIN reservoir_compartments rc
+        ON rc.id = msaf.reservoir_compartment_id
+
+      JOIN (
+        SELECT
+          ws.well_id,
+          MAX(msaf.production_month) AS latestMonth
+        FROM well_strings ws
+        JOIN monthly_string_allocation_factors msaf
+          ON msaf.string_id = ws.id
+        GROUP BY ws.well_id
+      ) latest
+        ON latest.well_id = ws.well_id
+        AND latest.latestMonth = msaf.production_month
+
+      GROUP BY ws.well_id
+    ) compartments
+      ON compartments.well_id = w.id
+
+    WHERE w.field_id = ?
+      AND w.well_role = 'Producer'
+
+    ORDER BY w.name
   `).all(fieldId)
 
   const calculatedWells = wells.map((well) => {
@@ -147,25 +196,32 @@ app.get('/api/fields/:fieldId/wells', (req, res) => {
   res.json(calculatedWells)
 })
 
-app.get('/api/wells/:wellId/history', (req, res) => {
-  const wellId = req.params.wellId
+  app.get('/api/wells/:wellId/history', (req, res) => {
+    const wellId = req.params.wellId
 
   const rows = db.prepare(`
     SELECT
-      mpa.production_month AS productionMonth,
-      SUM(mpa.oil_volume_stb) AS oilVolumeStb,
-      SUM(mpa.water_volume_stb) AS waterVolumeStb,
-      SUM(mpa.gas_volume_mscf) AS gasVolumeMscf,
-      wms.production_days AS productionDays
-    FROM monthly_production_allocations mpa
-    LEFT JOIN well_monthly_status wms
-      ON wms.well_id = mpa.well_id
-      AND wms.production_month = mpa.production_month
-    WHERE mpa.well_id = ?
+      msp.production_month AS productionMonth,
+
+      SUM(msp.oil_volume_stb) AS oilVolumeStb,
+      SUM(msp.water_volume_stb) AS waterVolumeStb,
+      SUM(msp.gas_volume_mscf) AS gasVolumeMscf,
+
+      MAX(msp.production_days) AS productionDays,
+      MAX(msp.idle_reason) AS idleReason
+
+    FROM well_strings ws
+
+    JOIN monthly_string_production msp
+      ON msp.string_id = ws.id
+
+    WHERE ws.well_id = ?
+
     GROUP BY
-      mpa.production_month,
-      wms.production_days
-    ORDER BY mpa.production_month
+      msp.production_month
+
+    ORDER BY
+      msp.production_month
   `).all(wellId)
 
   const history = rows.map((row) => {
@@ -316,40 +372,86 @@ app.get('/api/fields/:fieldId/injectors', (req, res) => {
       w.id,
       w.name,
       w.injector_type AS injectorType,
-      GROUP_CONCAT(DISTINCT r.name || ' / ' || fb.name) AS reservoirFaultBlocks,
-      SUM(mia.water_injection_bbl) AS waterInjectionBbl,
-      SUM(mia.gas_injection_mscf) AS gasInjectionMscf,
-      wms.production_days AS injectionDays,
-      latest.latest_month AS productionMonth,
-      wms.idle_reason AS idleReason
+
+      compartments.reservoirFaultBlocks,
+
+      injection.waterInjectionBbl,
+      injection.gasInjectionMscf,
+      injection.injectionDays,
+      injection.productionMonth,
+      injection.idleReason
+
     FROM wells w
+
     LEFT JOIN (
       SELECT
-        well_id,
-        MAX(production_month) AS latest_month
-      FROM monthly_injection_allocations
-      GROUP BY well_id
-    ) latest
-      ON latest.well_id = w.id
-    LEFT JOIN monthly_injection_allocations mia
-      ON mia.well_id = w.id
-      AND mia.production_month = latest.latest_month
-    LEFT JOIN reservoirs r
-      ON r.id = mia.reservoir_id
-    LEFT JOIN fault_blocks fb
-      ON fb.id = mia.fault_block_id
-    LEFT JOIN well_monthly_status wms
-      ON wms.well_id = w.id
-      AND wms.production_month = latest.latest_month
+        ws.well_id,
+
+        SUM(msi.water_injection_bbl) AS waterInjectionBbl,
+        SUM(msi.gas_injection_mscf) AS gasInjectionMscf,
+
+        MAX(msi.injection_days) AS injectionDays,
+        msi.production_month AS productionMonth,
+        MAX(msi.idle_reason) AS idleReason
+
+      FROM well_strings ws
+
+      JOIN monthly_string_injection msi
+        ON msi.string_id = ws.id
+
+      JOIN (
+        SELECT
+          ws.well_id,
+          MAX(msi.production_month) AS latestMonth
+        FROM well_strings ws
+        JOIN monthly_string_injection msi
+          ON msi.string_id = ws.id
+        GROUP BY ws.well_id
+      ) latest
+        ON latest.well_id = ws.well_id
+        AND latest.latestMonth = msi.production_month
+
+      GROUP BY
+        ws.well_id,
+        msi.production_month
+    ) injection
+      ON injection.well_id = w.id
+
+    LEFT JOIN (
+      SELECT
+        ws.well_id,
+
+        GROUP_CONCAT(
+          DISTINCT rc.name
+        ) AS reservoirFaultBlocks
+
+      FROM well_strings ws
+
+      JOIN monthly_string_injection_allocation_factors msiaf
+        ON msiaf.string_id = ws.id
+
+      JOIN reservoir_compartments rc
+        ON rc.id = msiaf.reservoir_compartment_id
+
+      JOIN (
+        SELECT
+          ws.well_id,
+          MAX(msiaf.production_month) AS latestMonth
+        FROM well_strings ws
+        JOIN monthly_string_injection_allocation_factors msiaf
+          ON msiaf.string_id = ws.id
+        GROUP BY ws.well_id
+      ) latest
+        ON latest.well_id = ws.well_id
+        AND latest.latestMonth = msiaf.production_month
+
+      GROUP BY ws.well_id
+    ) compartments
+      ON compartments.well_id = w.id
+
     WHERE w.field_id = ?
       AND w.well_role = 'Injector'
-    GROUP BY
-      w.id,
-      w.name,
-      w.injector_type,
-      wms.production_days,
-      wms.idle_reason,
-      latest.latest_month
+
     ORDER BY w.name
   `).all(fieldId)
 
@@ -624,13 +726,60 @@ app.get('/api/fields/:fieldId/compartment-production', (req, res) => {
 
 app.get('/api/fields/:fieldId/field-production', (req, res) => {
   try {
-    const data = productionQueries.getFieldProduction(
+    const rows = productionQueries.getFieldProduction(
       req.params.fieldId
     )
 
-    res.json(data)
+    let cumulativeOilStb = 0
+
+    const history = rows.map((row) => {
+      const calendarDays = getCalendarDays(
+        row.productionMonth
+      )
+
+      cumulativeOilStb += row.oilVolumeStb
+
+      const liquidVolume =
+        row.oilVolumeStb + row.waterVolumeStb
+
+      const oilRateCalendarDays =
+        calendarDays > 0
+          ? row.oilVolumeStb / calendarDays
+          : 0
+
+      const waterCut =
+        liquidVolume > 0
+          ? (row.waterVolumeStb / liquidVolume) * 100
+          : 0
+
+      const gorScfStb =
+        row.oilVolumeStb > 0
+          ? (row.gasVolumeMscf * 1000) /
+            row.oilVolumeStb
+          : 0
+
+      return {
+        month: row.productionMonth,
+        oilVolumeStb: Math.round(row.oilVolumeStb),
+        waterVolumeStb: Math.round(row.waterVolumeStb),
+        gasVolumeMscf: Math.round(row.gasVolumeMscf),
+        oilRateCalendarDays: Math.round(
+          oilRateCalendarDays
+        ),
+        waterCut: Math.round(waterCut),
+        gorScfStb: Math.round(gorScfStb),
+        cumulativeOilStb: Math.round(
+          cumulativeOilStb
+        ),
+      }
+    })
+
+    res.json(history)
   } catch (error) {
-    console.error('Failed to load field production:', error)
+    console.error(
+      'Failed to load field production:',
+      error
+    )
 
     res.status(500).json({
       error: 'Failed to load field production',
@@ -648,12 +797,54 @@ app.get('/api/fields/:fieldId/compartment-injection', (req, res) => {
 })
 
 app.get('/api/fields/:fieldId/field-injection', (req, res) => {
-  const fieldId = req.params.fieldId
+  try {
+    const rows = productionQueries.getFieldInjection(
+      req.params.fieldId
+    )
 
-  const result =
-    productionQueries.getFieldInjection(fieldId)
+    const history = rows.map((row) => {
+      const calendarDays = getCalendarDays(
+        row.productionMonth
+      )
 
-  res.json(result)
+      const waterInjectionRate =
+        calendarDays > 0
+          ? row.waterInjectionBbl / calendarDays
+          : 0
+
+      const gasInjectionRate =
+        calendarDays > 0
+          ? row.gasInjectionMscf / calendarDays
+          : 0
+
+      return {
+        month: row.productionMonth,
+        waterInjectionBbl: Math.round(
+          row.waterInjectionBbl
+        ),
+        gasInjectionMscf: Math.round(
+          row.gasInjectionMscf
+        ),
+        waterInjectionRate: Math.round(
+          waterInjectionRate
+        ),
+        gasInjectionRate: Math.round(
+          gasInjectionRate
+        ),
+      }
+    })
+
+    res.json(history)
+  } catch (error) {
+    console.error(
+      'Failed to load field injection:',
+      error
+    )
+
+    res.status(500).json({
+      error: 'Failed to load field injection',
+    })
+  }
 })
 
 app.listen(4000, () => {
