@@ -506,6 +506,162 @@ function createFieldRoutes(db, productionQueries) {
     }
   })
 
+  router.get('/:fieldId/reservoir-summary', (req, res) => {
+    const fieldId = req.params.fieldId
+
+    try {
+      const rows = db.prepare(`
+        SELECT
+          r.id,
+          r.name,
+          r.stoiip_mmstb AS stoiipMmstb,
+          r.giip_bscf AS giipBscf,
+          r.gas_cap_m AS gasCapM,
+          r.initial_pressure_psia AS initialPressurePsia,
+          r.drive_mechanism AS driveMechanism,
+          r.fluid_type AS fluidType,
+          r.temperature_f AS temperatureF,
+
+          production.oilVolumeStb,
+          production.waterVolumeStb,
+          production.gasVolumeMscf,
+
+          latestPressure.pressure_psia AS latestPressurePsia,
+          latestPressure.survey_date AS latestPressureDate,
+          latestPressure.survey_type AS latestPressureType
+
+        FROM reservoirs r
+
+        LEFT JOIN (
+          SELECT
+            rc.reservoir_id AS reservoirId,
+
+            SUM(
+              msp.oil_volume_stb *
+              msaf.allocation_fraction
+            ) AS oilVolumeStb,
+
+            SUM(
+              msp.water_volume_stb *
+              msaf.allocation_fraction
+            ) AS waterVolumeStb,
+
+            SUM(
+              msp.gas_volume_mscf *
+              msaf.allocation_fraction
+            ) AS gasVolumeMscf
+
+          FROM monthly_string_production msp
+
+          JOIN monthly_string_allocation_factors msaf
+            ON msaf.string_id = msp.string_id
+            AND msaf.production_month = msp.production_month
+
+          JOIN well_strings ws
+            ON ws.id = msp.string_id
+
+          JOIN wells w
+            ON w.id = ws.well_id
+            AND w.well_role = 'Producer'
+
+          JOIN reservoir_compartments rc
+            ON rc.id = msaf.reservoir_compartment_id
+
+          GROUP BY rc.reservoir_id
+        ) production
+          ON production.reservoirId = r.id
+
+        LEFT JOIN (
+          SELECT
+            rps.reservoir_id,
+            rps.pressure_psia,
+            rps.survey_date,
+            rps.survey_type
+
+          FROM reservoir_pressure_surveys rps
+
+          INNER JOIN (
+            SELECT
+              reservoir_id,
+              MAX(survey_date) AS latest_date
+
+            FROM reservoir_pressure_surveys
+
+            GROUP BY reservoir_id
+          ) latest
+            ON latest.reservoir_id = rps.reservoir_id
+            AND latest.latest_date = rps.survey_date
+        ) latestPressure
+          ON latestPressure.reservoir_id = r.id
+
+        WHERE r.field_id = ?
+
+        ORDER BY r.name
+      `).all(fieldId)
+
+      const result = rows.map((row) => {
+        const oilVolumeStb = row.oilVolumeStb || 0
+        const waterVolumeStb = row.waterVolumeStb || 0
+        const gasVolumeMscf = row.gasVolumeMscf || 0
+
+        const liquidVolume = oilVolumeStb + waterVolumeStb
+
+        const waterCut =
+          liquidVolume > 0
+            ? (waterVolumeStb / liquidVolume) * 100
+            : 0
+
+        const gor =
+          oilVolumeStb > 0
+            ? (gasVolumeMscf * 1000) / oilVolumeStb
+            : 0
+
+        const recoveryFactor =
+          row.stoiipMmstb > 0
+            ? (
+                oilVolumeStb /
+                1_000_000 /
+                row.stoiipMmstb
+              ) * 100
+            : 0
+
+        return {
+          id: row.id,
+          name: row.name,
+          stoiipMmstb: row.stoiipMmstb,
+          giipBscf: row.giipBscf,
+          gasCapM: row.gasCapM,
+          initialPressurePsia: row.initialPressurePsia,
+          latestPressurePsia: row.latestPressurePsia,
+          latestPressureDate: row.latestPressureDate,
+          latestPressureType: row.latestPressureType,
+          driveMechanism: row.driveMechanism,
+          fluidType: row.fluidType,
+          temperatureF: row.temperatureF,
+          oilVolumeStb: Math.round(oilVolumeStb),
+          waterVolumeStb: Math.round(waterVolumeStb),
+          gasVolumeMscf: Math.round(gasVolumeMscf),
+          recoveryFactor: Number(
+            recoveryFactor.toFixed(2)
+          ),
+          waterCut: Math.round(waterCut),
+          gor: Math.round(gor),
+        }
+      })
+
+      res.json(result)
+    } catch (error) {
+      console.error(
+        'Failed to load reservoir summary:',
+        error
+      )
+
+      res.status(500).json({
+        error: 'Failed to load reservoir summary',
+      })
+    }
+  })
+
   return router
 }
 
