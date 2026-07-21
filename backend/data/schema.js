@@ -4,10 +4,12 @@ function createSchema(db) {
     DROP TABLE IF EXISTS monthly_string_injection;
     DROP TABLE IF EXISTS monthly_string_allocation_factors;
     DROP TABLE IF EXISTS monthly_string_production;
-    DROP TABLE IF EXISTS well_strings;
-    DROP TABLE IF EXISTS reservoir_compartments;
+
     DROP TABLE IF EXISTS monthly_injection_allocations;
     DROP TABLE IF EXISTS monthly_production_allocations;
+
+    DROP TABLE IF EXISTS well_strings;
+    DROP TABLE IF EXISTS reservoir_compartments;
     DROP TABLE IF EXISTS well_monthly_status;
     DROP TABLE IF EXISTS reservoir_pressure_surveys;
     DROP TABLE IF EXISTS fault_blocks;
@@ -130,7 +132,10 @@ function createSchema(db) {
         reservoir_compartment_id,
         production_month
       ),
-      CHECK (allocation_fraction >= 0 AND allocation_fraction <= 1)
+      CHECK (
+        allocation_fraction >= 0
+        AND allocation_fraction <= 1
+      )
     );
 
     CREATE TABLE monthly_string_injection_allocation_factors (
@@ -149,7 +154,10 @@ function createSchema(db) {
         reservoir_compartment_id,
         production_month
       ),
-      CHECK (allocation_fraction >= 0 AND allocation_fraction <= 1)
+      CHECK (
+        allocation_fraction >= 0
+        AND allocation_fraction <= 1
+      )
     );
 
     CREATE TABLE well_monthly_status (
@@ -160,33 +168,6 @@ function createSchema(db) {
       idle_reason TEXT,
       FOREIGN KEY (well_id) REFERENCES wells(id),
       UNIQUE (well_id, production_month)
-    );
-
-    CREATE TABLE monthly_production_allocations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      well_id INTEGER NOT NULL,
-      reservoir_id INTEGER NOT NULL,
-      fault_block_id INTEGER NOT NULL,
-      production_month TEXT NOT NULL,
-      oil_volume_stb REAL NOT NULL,
-      water_volume_stb REAL NOT NULL,
-      gas_volume_mscf REAL NOT NULL,
-      FOREIGN KEY (well_id) REFERENCES wells(id),
-      FOREIGN KEY (reservoir_id) REFERENCES reservoirs(id),
-      FOREIGN KEY (fault_block_id) REFERENCES fault_blocks(id)
-    );
-
-    CREATE TABLE monthly_injection_allocations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      well_id INTEGER NOT NULL,
-      reservoir_id INTEGER NOT NULL,
-      fault_block_id INTEGER NOT NULL,
-      production_month TEXT NOT NULL,
-      water_injection_bbl REAL NOT NULL,
-      gas_injection_mscf REAL NOT NULL,
-      FOREIGN KEY (well_id) REFERENCES wells(id),
-      FOREIGN KEY (reservoir_id) REFERENCES reservoirs(id),
-      FOREIGN KEY (fault_block_id) REFERENCES fault_blocks(id)
     );
   `)
 }

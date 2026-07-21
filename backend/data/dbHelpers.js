@@ -46,7 +46,7 @@ function createDbHelpers(db) {
   `)
 
   // =========================================================
-  // Prepared statements: existing producer model
+  // Prepared statements: well monthly status
   // =========================================================
 
   const insertWellMonthlyStatus = db.prepare(`
@@ -57,35 +57,6 @@ function createDbHelpers(db) {
       idle_reason
     )
     VALUES (?, ?, ?, ?)
-  `)
-
-  const insertProductionAllocation = db.prepare(`
-    INSERT INTO monthly_production_allocations (
-      well_id,
-      reservoir_id,
-      fault_block_id,
-      production_month,
-      oil_volume_stb,
-      water_volume_stb,
-      gas_volume_mscf
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `)
-
-  // =========================================================
-  // Prepared statements: existing injector model
-  // =========================================================
-
-  const insertInjectionAllocation = db.prepare(`
-    INSERT INTO monthly_injection_allocations (
-      well_id,
-      reservoir_id,
-      fault_block_id,
-      production_month,
-      water_injection_bbl,
-      gas_injection_mscf
-    )
-    VALUES (?, ?, ?, ?, ?, ?)
   `)
 
   // =========================================================
@@ -270,74 +241,22 @@ function createDbHelpers(db) {
   }
 
   // =========================================================
-  // Producer allocation helper
+  // Well monthly status helper
   // =========================================================
 
-  function addAllocation(
+  function addWellMonthlyStatus(
     wellName,
-    reservoirName,
-    faultBlockName,
     month,
-    oilVolumeStb,
-    waterVolumeStb,
-    gasVolumeMscf,
     productionDays,
     idleReason = null
   ) {
     const well = getWell.get(wellName)
-    const reservoir = getReservoir.get(reservoirName)
-    const faultBlock = getFaultBlock.get(faultBlockName)
 
     insertWellMonthlyStatus.run(
       well.id,
       month,
       productionDays,
       idleReason
-    )
-
-    insertProductionAllocation.run(
-      well.id,
-      reservoir.id,
-      faultBlock.id,
-      month,
-      oilVolumeStb,
-      waterVolumeStb,
-      gasVolumeMscf
-    )
-  }
-
-  // =========================================================
-  // Injector allocation helper
-  // =========================================================
-
-  function addInjectionAllocation(
-    wellName,
-    reservoirName,
-    faultBlockName,
-    month,
-    waterInjectionBbl,
-    gasInjectionMscf,
-    injectionDays,
-    idleReason = null
-  ) {
-    const well = getWell.get(wellName)
-    const reservoir = getReservoir.get(reservoirName)
-    const faultBlock = getFaultBlock.get(faultBlockName)
-
-    insertWellMonthlyStatus.run(
-      well.id,
-      month,
-      injectionDays,
-      idleReason
-    )
-
-    insertInjectionAllocation.run(
-      well.id,
-      reservoir.id,
-      faultBlock.id,
-      month,
-      waterInjectionBbl,
-      gasInjectionMscf
     )
   }
 
@@ -493,9 +412,9 @@ function createDbHelpers(db) {
     )
   }
 
-// =========================================================
-// String injection allocation factor helper
-// =========================================================
+  // =========================================================
+  // String injection allocation factor helper
+  // =========================================================
 
   function addStringInjectionAllocationFactor(
     stringName,
@@ -528,8 +447,7 @@ function createDbHelpers(db) {
     addWell,
     addReservoir,
     addFaultBlock,
-    addAllocation,
-    addInjectionAllocation,
+    addWellMonthlyStatus,
     addPressureSurvey,
     addWellString,
     addReservoirCompartment,
