@@ -21,13 +21,15 @@ function FieldDashboard({
   const [historyError, setHistoryError] = useState('')
 
   const [injectionHistory, setInjectionHistory] = useState([])
-  const [isLoadingInjectionHistory, setIsLoadingInjectionHistory] =
-  useState(false)
+  const [isLoadingInjectionHistory, setIsLoadingInjectionHistory] = useState(false)
   const [injectionHistoryError, setInjectionHistoryError] = useState('')
 
+  const [injectorReservoirHistory,setInjectorReservoirHistory,] = useState([])
+  const [isLoadingInjectorReservoirHistory,setIsLoadingInjectorReservoirHistory,] = useState(false)
+  const [injectorReservoirHistoryError,setInjectorReservoirHistoryError,] = useState('')
+
   const [reservoirHistory, setReservoirHistory] = useState([])
-  const [isLoadingReservoirHistory, setIsLoadingReservoirHistory] =
-    useState(false)
+  const [isLoadingReservoirHistory, setIsLoadingReservoirHistory] = useState(false)
   const [reservoirHistoryError, setReservoirHistoryError] = useState('')
 
   const [injectors, setInjectors] = useState([])
@@ -125,34 +127,62 @@ function FieldDashboard({
   }, [selectedProducer])
 
   useEffect(() => {
-  if (!selectedInjector) {
-    return
-  }
+    if (!selectedInjector) {
+      return
+    }
 
-  setIsLoadingInjectionHistory(true)
-  setInjectionHistoryError('')
+    setIsLoadingInjectionHistory(true)
+    setInjectionHistoryError('')
 
-  fetch(`/api/injectors/${selectedInjector.id}/history`)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error('Failed to load injection history')
-      }
+    fetch(`/api/injectors/${selectedInjector.id}/history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load injection history')
+        }
 
-      return response.json()
-    })
-    .then((data) => {
-      setInjectionHistory(data)
-    })
-    .catch(() => {
-      setInjectionHistory([])
-      setInjectionHistoryError(
-        'Unable to load injection history'
-      )
-    })
-    .finally(() => {
-      setIsLoadingInjectionHistory(false)
-    })
-}, [selectedInjector])
+        return response.json()
+      })
+      .then((data) => {
+        setInjectionHistory(data)
+      })
+      .catch(() => {
+        setInjectionHistory([])
+        setInjectionHistoryError(
+          'Unable to load injection history'
+        )
+      })
+      .finally(() => {
+        setIsLoadingInjectionHistory(false)
+      })
+
+    setIsLoadingInjectorReservoirHistory(true)
+    setInjectorReservoirHistoryError('')
+
+    fetch(
+      `/api/injectors/${selectedInjector.id}/reservoir-history`
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            'Failed to load injector reservoir history'
+          )
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setInjectorReservoirHistory(data)
+      })
+      .catch(() => {
+        setInjectorReservoirHistory([])
+        setInjectorReservoirHistoryError(
+          'Unable to load injector reservoir history'
+        )
+      })
+      .finally(() => {
+        setIsLoadingInjectorReservoirHistory(false)
+      })
+  }, [selectedInjector])
 
   return (
     <main className="app">
@@ -232,6 +262,9 @@ function FieldDashboard({
             injectionHistory={injectionHistory}
             isLoadingInjectionHistory={isLoadingInjectionHistory}
             injectionHistoryError={injectionHistoryError}
+            injectorReservoirHistory={injectorReservoirHistory}
+            isLoadingInjectorReservoirHistory={isLoadingInjectorReservoirHistory}
+            injectorReservoirHistoryError={injectorReservoirHistoryError}
           />
         )}
 

@@ -11,6 +11,7 @@ import InjectorDetail from '../components/InjectorDetail'
 import WaterInjectionHistoryChart from '../components/WaterInjectionHistoryChart'
 import GasInjectionHistoryChart from '../components/GasInjectionHistoryChart'
 import InjectionHistoryTable from '../components/InjectionHistoryTable'
+import InjectorReservoirContributionChart from '../components/InjectorReservoirContributionChart'
 
 function WellView({
   wells,
@@ -30,6 +31,9 @@ function WellView({
   injectionHistory,
   isLoadingInjectionHistory,
   injectionHistoryError,
+  injectorReservoirHistory,
+  isLoadingInjectorReservoirHistory,
+  injectorReservoirHistoryError,
 }) {
   const [wellMode, setWellMode] = useState('producers')
 
@@ -126,6 +130,15 @@ function WellView({
               <>
                 <WaterInjectionHistoryChart history={injectionHistory} />
                 <GasInjectionHistoryChart history={injectionHistory} />
+
+                {isLoadingInjectorReservoirHistory && <p>Loading reservoir injection contribution...</p>}
+
+                {injectorReservoirHistoryError && <p>{injectorReservoirHistoryError}</p>}
+
+                {!isLoadingInjectorReservoirHistory && !injectorReservoirHistoryError && (
+                  <InjectorReservoirContributionChart injectorReservoirHistory={injectorReservoirHistory} />
+                )}
+
                 <InjectionHistoryTable history={injectionHistory} />
               </>
             )}
