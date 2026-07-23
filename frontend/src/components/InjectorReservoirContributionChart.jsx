@@ -24,6 +24,7 @@ function InjectorReservoirContributionChart({
     ),
   ]
 
+  
   const waterData = Object.values(
     injectorReservoirHistory.reduce((acc, row) => {
       if (!acc[row.month]) {
