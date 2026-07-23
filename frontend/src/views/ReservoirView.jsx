@@ -6,6 +6,8 @@ import ReservoirProductionHistoryChart from '../components/ReservoirProductionHi
 import WaterCutChart from '../components/WaterCutChart'
 import GorChart from '../components/GorChart'
 import ReservoirCompartmentContributionChart from '../components/ReservoirCompartmentContributionChart'
+import ReservoirInjectionHistoryChart from '../components/ReservoirInjectionHistoryChart'
+import ReservoirInjectionCompartmentChart from '../components/ReservoirInjectionCompartmentChart'
 
 function ReservoirView({ field }) {
   const [reservoirs, setReservoirs] = useState([])
@@ -20,6 +22,14 @@ function ReservoirView({ field }) {
   const [compartmentHistory, setCompartmentHistory] = useState([])
   const [isLoadingCompartmentHistory, setIsLoadingCompartmentHistory] = useState(false)
   const [compartmentHistoryError, setCompartmentHistoryError] = useState('')
+
+  const [reservoirInjectionHistory, setReservoirInjectionHistory] = useState([])
+  const [isLoadingReservoirInjectionHistory, setIsLoadingReservoirInjectionHistory] = useState(false)
+  const [reservoirInjectionHistoryError, setReservoirInjectionHistoryError] = useState('')
+
+  const [injectionCompartmentHistory, setInjectionCompartmentHistory] = useState([])
+  const [isLoadingInjectionCompartmentHistory, setIsLoadingInjectionCompartmentHistory] = useState(false)
+  const [injectionCompartmentHistoryError, setInjectionCompartmentHistoryError] = useState('')
 
   useEffect(() => {
     setIsLoadingReservoirs(true)
@@ -51,6 +61,8 @@ function ReservoirView({ field }) {
     if (!selectedReservoir) {
       setReservoirHistory([])
       setCompartmentHistory([])
+      setReservoirInjectionHistory([])
+      setInjectionCompartmentHistory([])
       return
     }
 
@@ -97,6 +109,50 @@ function ReservoirView({ field }) {
       .finally(() => {
         setIsLoadingCompartmentHistory(false)
       })
+
+    setIsLoadingReservoirInjectionHistory(true)
+    setReservoirInjectionHistoryError('')
+
+    fetch(`/api/reservoirs/${selectedReservoir.id}/injection-history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load reservoir injection history')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setReservoirInjectionHistory(data)
+      })
+      .catch(() => {
+        setReservoirInjectionHistory([])
+        setReservoirInjectionHistoryError('Unable to load reservoir injection history')
+      })
+      .finally(() => {
+        setIsLoadingReservoirInjectionHistory(false)
+      })
+
+    setIsLoadingInjectionCompartmentHistory(true)
+    setInjectionCompartmentHistoryError('')
+
+    fetch(`/api/reservoirs/${selectedReservoir.id}/injection-compartment-history`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load injection compartment history')
+        }
+
+        return response.json()
+      })
+      .then((data) => {
+        setInjectionCompartmentHistory(data)
+      })
+      .catch(() => {
+        setInjectionCompartmentHistory([])
+        setInjectionCompartmentHistoryError('Unable to load injection compartment history')
+      })
+      .finally(() => {
+        setIsLoadingInjectionCompartmentHistory(false)
+      })
   }, [selectedReservoir])
 
   return (
@@ -126,6 +182,8 @@ function ReservoirView({ field }) {
           </section>
 
           <section className="panel history-panel">
+            <h2>Production Surveillance</h2>
+
             {isLoadingReservoirHistory && <p>Loading reservoir history...</p>}
 
             {reservoirHistoryError && <p>{reservoirHistoryError}</p>}
@@ -144,6 +202,26 @@ function ReservoirView({ field }) {
 
             {!isLoadingCompartmentHistory && !compartmentHistoryError && (
               <ReservoirCompartmentContributionChart compartmentHistory={compartmentHistory} />
+            )}
+          </section>
+
+          <section className="panel history-panel">
+            <h2>Injection Surveillance</h2>
+
+            {isLoadingReservoirInjectionHistory && <p>Loading reservoir injection history...</p>}
+
+            {reservoirInjectionHistoryError && <p>{reservoirInjectionHistoryError}</p>}
+
+            {!isLoadingReservoirInjectionHistory && !reservoirInjectionHistoryError && (
+              <ReservoirInjectionHistoryChart history={reservoirInjectionHistory} />
+            )}
+
+            {isLoadingInjectionCompartmentHistory && <p>Loading injection fault block contribution...</p>}
+
+            {injectionCompartmentHistoryError && <p>{injectionCompartmentHistoryError}</p>}
+
+            {!isLoadingInjectionCompartmentHistory && !injectionCompartmentHistoryError && (
+              <ReservoirInjectionCompartmentChart compartmentHistory={injectionCompartmentHistory} />
             )}
           </section>
         </>

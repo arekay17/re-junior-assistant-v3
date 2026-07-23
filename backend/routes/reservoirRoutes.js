@@ -97,6 +97,94 @@ function createReservoirRoutes(db) {
     res.json(history)
   })
 
+  router.get('/:reservoirId/injection-history', (req, res) => {
+    const reservoirId = req.params.reservoirId
+
+    const rows = db.prepare(`
+      SELECT
+        msi.production_month AS productionMonth,
+        SUM(msi.water_injection_bbl * msiaf.allocation_fraction) AS waterInjectionBbl,
+        SUM(msi.gas_injection_mscf * msiaf.allocation_fraction) AS gasInjectionMscf
+      FROM reservoir_compartments rc
+      JOIN monthly_string_injection_allocation_factors msiaf
+        ON msiaf.reservoir_compartment_id = rc.id
+      JOIN monthly_string_injection msi
+        ON msi.string_id = msiaf.string_id
+        AND msi.production_month = msiaf.production_month
+      WHERE rc.reservoir_id = ?
+      GROUP BY msi.production_month
+      ORDER BY msi.production_month
+    `).all(reservoirId)
+
+    let cumulativeWaterInjectionBbl = 0
+    let cumulativeGasInjectionMscf = 0
+
+    const history = rows.map((row) => {
+      const calendarDays = getCalendarDays(row.productionMonth)
+      const waterInjectionBbl = row.waterInjectionBbl || 0
+      const gasInjectionMscf = row.gasInjectionMscf || 0
+
+      const waterInjectionRate = calendarDays > 0 ? waterInjectionBbl / calendarDays : 0
+      const gasInjectionRate = calendarDays > 0 ? gasInjectionMscf / calendarDays : 0
+
+      cumulativeWaterInjectionBbl += waterInjectionBbl
+      cumulativeGasInjectionMscf += gasInjectionMscf
+
+      return {
+        month: row.productionMonth,
+        waterInjectionBbl: Math.round(waterInjectionBbl),
+        gasInjectionMscf: Math.round(gasInjectionMscf),
+        calendarDays,
+        waterInjectionRate: Math.round(waterInjectionRate),
+        gasInjectionRate: Math.round(gasInjectionRate),
+        cumulativeWaterInjectionBbl: Math.round(cumulativeWaterInjectionBbl),
+        cumulativeGasInjectionMscf: Math.round(cumulativeGasInjectionMscf),
+      }
+    })
+
+    res.json(history)
+  })
+
+  router.get('/:reservoirId/injection-compartment-history', (req, res) => {
+    const reservoirId = req.params.reservoirId
+
+    const rows = db.prepare(`
+      SELECT
+        rc.id AS reservoirCompartmentId,
+        rc.name AS reservoirFaultBlock,
+        r.name AS reservoir,
+        fb.name AS faultBlock,
+        msi.production_month AS productionMonth,
+        SUM(msi.water_injection_bbl * msiaf.allocation_fraction) AS waterInjectionBbl,
+        SUM(msi.gas_injection_mscf * msiaf.allocation_fraction) AS gasInjectionMscf
+      FROM reservoir_compartments rc
+      JOIN reservoirs r
+        ON r.id = rc.reservoir_id
+      JOIN fault_blocks fb
+        ON fb.id = rc.fault_block_id
+      JOIN monthly_string_injection_allocation_factors msiaf
+        ON msiaf.reservoir_compartment_id = rc.id
+      JOIN monthly_string_injection msi
+        ON msi.string_id = msiaf.string_id
+        AND msi.production_month = msiaf.production_month
+      WHERE rc.reservoir_id = ?
+      GROUP BY rc.id, rc.name, r.name, fb.name, msi.production_month
+      ORDER BY rc.name, msi.production_month
+    `).all(reservoirId)
+
+    const history = rows.map((row) => ({
+      reservoirCompartmentId: row.reservoirCompartmentId,
+      reservoir: row.reservoir,
+      faultBlock: row.faultBlock,
+      reservoirFaultBlock: row.reservoirFaultBlock,
+      month: row.productionMonth,
+      waterInjectionBbl: Math.round(row.waterInjectionBbl || 0),
+      gasInjectionMscf: Math.round(row.gasInjectionMscf || 0),
+    }))
+
+    res.json(history)
+  })
+
   return router
 }
 
